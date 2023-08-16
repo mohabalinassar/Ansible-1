@@ -1,0 +1,54 @@
+---
+- name: Install and configure NGINX
+  hosts: nginx
+  become: true
+  tasks:
+    - name: Install NGINX package
+      apt:
+        name: nginx
+        state: present
+    - name: Create custom index.html page
+      copy:
+        content: "<html><body><h1>Hello Sprints</h1></body></html>"
+        dest: /var/www/html/index.html
+  handlers:
+    - name: Restart NGINX
+      systemd:
+        name: nginx
+        state: restarted
+
+- name: Change Nginx listening port
+  hosts: all
+  become: true
+  tasks:
+    - name: Modify Nginx configuration file
+      replace:
+        path: /etc/nginx/sites-enabled/default
+        regexp: 'listen\s+80\s+default_server;'
+        replace: 'listen 8090 default_server;'
+      notify: Restart NGINX
+  handlers:
+    - name: Restart NGINX
+      systemd:
+        name: nginx
+        state: restarted
+
+- name: Deploy app from GitHub
+  hosts: nginx
+  become: true
+  tasks:
+    - name: Clone the repository
+      git:
+        repo: https://github.com/sabreensalama/dockerize-node-app-task
+        dest: /app
+    - name: Install Node.js and npm
+      apt:
+        name: [nodejs, npm]
+        state: present
+        update_cache: true
+    - name: Install app dependencies
+      npm:
+        path: /app
+        state: latest
+    - name: Run the Node.js app
+      shell: node /app/server.js &
